@@ -9,7 +9,9 @@ class Etapa(StrEnum):
     ESPECIALIDADE = "especialidade"
     PROFISSIONAL = "profissional"
     DATA_HORARIO = "data_horario"
+    HORARIO = "horario"
     CONFIRMACAO = "confirmacao"
+    CONCLUIDA = "concluida"
 
 
 class MensagemRequest(BaseModel):
@@ -24,6 +26,7 @@ class OpcaoResponse(BaseModel):
 
 
 class MensagemResponse(BaseModel):
+    conversa_id: str
     etapa: Etapa
     mensagem: str
     opcoes: list[OpcaoResponse] = Field(default_factory=list)

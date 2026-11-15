@@ -10,6 +10,7 @@ class MensagemComposer extends StatelessWidget {
     required this.onAnexar,
     required this.onRemoverAnexo,
     this.nomeAnexo,
+    this.carregando = false,
   });
 
   final TextEditingController controller;
@@ -17,6 +18,7 @@ class MensagemComposer extends StatelessWidget {
   final VoidCallback onAnexar;
   final VoidCallback onRemoverAnexo;
   final String? nomeAnexo;
+  final bool carregando;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +60,7 @@ class MensagemComposer extends StatelessWidget {
                   children: [
                     IconButton(
                       tooltip: 'Anexar arquivo',
-                      onPressed: onAnexar,
+                      onPressed: carregando ? null : onAnexar,
                       icon: const Icon(Icons.attach_file_rounded, size: 23),
                       color: const Color(0xFFD0E1D9),
                     ),
@@ -66,6 +68,7 @@ class MensagemComposer extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: controller,
+                        enabled: !carregando,
                         minLines: 1,
                         maxLines: 4,
                         textCapitalization: TextCapitalization.sentences,
@@ -77,7 +80,7 @@ class MensagemComposer extends StatelessWidget {
                         ),
                         cursorColor: const Color(0xFFD6E8DB),
                         decoration: const InputDecoration(
-                          hintText: 'Digite sua mensagem...',
+                          hintText: 'Digite o número da opção...',
                           hintStyle: TextStyle(
                             color: Color(0xFFC0D1C8),
                             fontSize: 14,
@@ -97,7 +100,8 @@ class MensagemComposer extends StatelessWidget {
                             value.text.trim().isNotEmpty || nomeAnexo != null;
                         return IconButton.filled(
                           tooltip: 'Enviar mensagem',
-                          onPressed: podeEnviar ? onEnviar : null,
+                          onPressed:
+                              podeEnviar && !carregando ? onEnviar : null,
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(0xFF558F7E),
                             disabledBackgroundColor: const Color(0xAA558F7E),

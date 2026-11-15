@@ -18,14 +18,24 @@ class _PacientePageState extends ConsumerState<PacientePage> {
   final _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(conversaProvider.notifier).iniciar();
+    });
+  }
+
+  @override
   void dispose() {
     _textoController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _enviar() {
-    if (ref.read(conversaProvider.notifier).enviar(_textoController.text)) {
+  Future<void> _enviar() async {
+    if (await ref
+        .read(conversaProvider.notifier)
+        .enviar(_textoController.text)) {
       _textoController.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scrollController.hasClients) {
@@ -137,7 +147,9 @@ class _PacientePageState extends ConsumerState<PacientePage> {
                                         1 -
                                         index];
                                 return Align(
-                                  alignment: Alignment.centerRight,
+                                  alignment: mensagem.doPaciente
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
                                   child: Container(
                                     constraints: BoxConstraints(
                                       maxWidth: compact
@@ -149,7 +161,9 @@ class _PacientePageState extends ConsumerState<PacientePage> {
                                       vertical: 13,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xE02D5D50),
+                                      color: mensagem.doPaciente
+                                          ? const Color(0xE02D5D50)
+                                          : const Color(0xE0243934),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: const Color(0x337FAE9B),
@@ -178,6 +192,24 @@ class _PacientePageState extends ConsumerState<PacientePage> {
                                               height: 1.5,
                                             ),
                                           ),
+                                        for (
+                                          var index = 0;
+                                          index < mensagem.opcoes.length;
+                                          index++
+                                        )
+                                          Padding(
+                                            padding: EdgeInsets.only(
+                                              top: index == 0 ? 8 : 3,
+                                            ),
+                                            child: Text(
+                                              '${index + 1}. ${mensagem.opcoes[index]}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                height: 1.4,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -187,11 +219,38 @@ class _PacientePageState extends ConsumerState<PacientePage> {
                           ),
                         ),
                       ),
+                      if (conversa.carregando)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: LinearProgressIndicator(),
+                        ),
+                      if (conversa.erro != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  conversa.erro!,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              if (conversa.conversaId == null)
+                                TextButton(
+                                  onPressed: () => ref
+                                      .read(conversaProvider.notifier)
+                                      .iniciar(),
+                                  child: const Text('Tentar novamente'),
+                                ),
+                            ],
+                          ),
+                        ),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 760),
                         child: MensagemComposer(
                           controller: _textoController,
                           nomeAnexo: conversa.nomeAnexo,
+                          carregando: conversa.carregando,
                           onEnviar: _enviar,
                           onAnexar: _anexar,
                           onRemoverAnexo: () =>
