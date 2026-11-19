@@ -26,16 +26,18 @@ Este README concentra a documentação do projeto e de **todas as pastas e arqui
 
 | Parte | O que existe hoje |
 |---|---|
-| Interface do paciente | Tela responsiva de chat conectada à API demonstrativa; mostra perguntas e opções numeradas |
-| Estado da conversa | Riverpod controla mensagens, carregamento, erros e a conversa ativa |
-| Armazenamento no Flutter | Lista em memória, sem persistência em banco |
-| Backend do chatbot | API FastAPI conectada ao Flutter, com agenda demonstrativa em memória |
-| Agendamento | Escolhas por número para especialidade, profissional, data e horário; confirmação explícita e dados fictícios |
+| Interface do paciente | Tela responsiva com fundo de cachoeira, marca da clínica, campo de mensagem, seleção de arquivo e exibição das mensagens locais |
+| Estado da conversa | Riverpod controla mensagens do paciente e do assistente, espera, erros, nova tentativa e opções de atendimento |
+| Armazenamento no Flutter | Histórico em memória e cliente HTTP para o backend Python |
+| Backend do chatbot | Rota de mensagens com saudação, apresentação do serviço e escolha entre quatro atendimentos |
+| Agendamento | Escolha inicial implementada no backend; datas, horários e reservas ainda não implementados |
 | Inteligência artificial | Nenhum modelo ou provedor integrado |
-| Anexos | Seletor disponível, mas arquivos ainda não são enviados ao atendimento |
-| Recepcionista e profissional | Pastas de camadas criadas, sem funcionalidades |
+| Comunicação Flutter–Python | Implementada por HTTP; mensagens e botões usam a mesma rota Python |
+| Docker | Backend em container com healthcheck, publicado por padrão em `127.0.0.1:8000` |
+| Recepcionista | Sidebar com quatro rotas e telas contendo somente o nome de cada feature |
+| Profissional | Pastas de camadas criadas, sem funcionalidades |
 
-O atendimento segue um fluxo guiado: digite o número da especialidade, do profissional, da data e do horário exibidos. A reserva só é criada após confirmação. Os dados são fictícios e ficam na memória do backend; não usar para consultas reais. O Flutter precisa estar com a API em execução para iniciar o chat.
+**As mensagens da tela são enviadas ao backend Python e as respostas aparecem na conversa.** As regras atuais reconhecem saudações e a escolha entre os quatro atendimentos. O histórico permanece em memória no Flutter. Arquivos selecionados não são enviados; o atendimento recebe somente texto.
 
 ## Tecnologias e dependências
 
@@ -49,14 +51,14 @@ As restrições abaixo estão declaradas em [app/pubspec.yaml](app/pubspec.yaml)
 | Flutter | SDK Flutter | Construção da interface e execução nas plataformas suportadas pelo projeto |
 | Material 3 | Incluído no Flutter | Tema, campos, botões e componentes visuais |
 | `flutter_riverpod` | `^3.4.3` | Gerenciamento de estado e composição do repositório da conversa |
-| `file_picker` | `^12.2.0` | Abrir o seletor de arquivos do sistema |
-| `http` | `^1.6.0` | Comunicação do app com a API de atendimento |
+| `file_picker` | `^13.4.0` | Abrir o seletor de arquivos do sistema |
+| `http` | `^1.6.0` | Enviar mensagens em JSON e receber respostas da API |
 | `flutter_test` | SDK Flutter; desenvolvimento | Testes de widgets e do estado da conversa |
 | `flutter_lints` | `^6.0.0`; desenvolvimento | Regras de análise estática |
 
 ### Backend Python
 
-As restrições estão em [requirements.txt](app/lib/repositorios/paciente/chatbot/requirements.txt). Elas são intervalos permitidos, não um registro das versões instaladas.
+As restrições estão em [requirements.txt](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/requirements.txt). Elas são intervalos permitidos, não um registro das versões instaladas.
 
 | Tecnologia | Restrição declarada | Responsabilidade |
 |---|---|---|
@@ -65,13 +67,14 @@ As restrições estão em [requirements.txt](app/lib/repositorios/paciente/chatb
 | Pydantic | `>=2.10,<3.0` | Validação de entradas e estruturação de respostas |
 | Uvicorn | `>=0.30,<1.0` | Servidor que executa a aplicação FastAPI |
 
-**Pydantic não é Pydantic AI.** O projeto usa Pydantic para validar dados e não possui um framework de agentes ou integração com modelo de IA. Também não há banco, ORM ou integração com uma agenda oficial.
+**Pydantic não é Pydantic AI.** O projeto usa Pydantic para validar dados e não possui um framework de agentes ou integração com modelo de IA. Não há banco ou ORM. A integração Flutter usa `http`, enquanto a execução local do backend é organizada por Docker Compose.
 
 ## Estrutura do projeto
 
 ```text
 clinica/
 ├── README.md
+├── compose.yaml
 └── app/
     ├── README.md
     ├── pubspec.yaml
@@ -84,17 +87,16 @@ clinica/
     ├── lib/
     │   ├── main.dart
     │   └── repositorios/
-    │       ├── paciente/
+    │       ├── paciente atendimento virtual/
     │       │   ├── domain/
     │       │   │   ├── entities/
-    │       │   │   │   └── mensagem_paciente.dart
+    │       │   │   │   ├── mensagem_paciente.dart
+    │       │   │   │   └── resposta_chatbot.dart
     │       │   │   └── repositories/
     │       │   │       └── conversa_repository.dart
     │       │   ├── data/
-    │       │   │   ├── repositories/
-    │       │   │   │   └── conversa_local_repository.dart
-    │       │   │   └── services/
-    │       │   │       └── chatbot_api.dart
+    │       │   │   └── repositories/
+    │       │   │       └── conversa_api_repository.dart
     │       │   ├── presentation/
     │       │   │   ├── pages/
     │       │   │   │   └── paciente_page.dart
@@ -102,24 +104,41 @@ clinica/
     │       │   │   │   └── conversa_provider.dart
     │       │   │   └── widgets/
     │       │   │       ├── clinica_brand.dart
-    │       │   │       └── mensagem_composer.dart
-    │       │   └── chatbot/
+    │       │   │       ├── mensagem_composer.dart
+    │       │   │       └── mensagem_balao.dart
+    │       │   └── backend do chatbot/
+    │       │       ├── Dockerfile
+    │       │       ├── .dockerignore
     │       │       ├── main.py
     │       │       ├── schemas.py
     │       │       ├── service.py
     │       │       ├── repository.py
     │       │       ├── requirements.txt
+    │       │       ├── tests/
+    │       │       │   ├── test_service.py
+    │       │       │   └── test_api.py
     │       │       └── .gitignore
     │       ├── recepcionista/
-    │       │   ├── domain/
-    │       │   ├── data/
-    │       │   └── presentation/
-    │       └── profissional_saude/
+    │       │   ├── features/
+    │       │   │   ├── agenda/presentation/agenda_page.dart
+    │       │   │   ├── pacientes/presentation/pacientes_page.dart
+    │       │   │   ├── profissionais/presentation/profissionais_page.dart
+    │       │   │   └── consultas/presentation/consultas_page.dart
+    │       │   └── global/
+    │       │       ├── recepcionista_routes.dart
+    │       │       ├── domain/
+    │       │       ├── data/
+    │       │       └── presentation/
+    │       │           ├── recepcionista_sidebar.dart
+    │       │           └── recepcionista_layout.dart
+    │       └── médicos/
     │           ├── domain/
     │           ├── data/
     │           └── presentation/
     ├── test/
-    │   └── widget_test.dart
+    │   ├── widget_test.dart
+    │   ├── chatbot_api_integration_test.dart
+    │   └── recepcionista_navigation_test.dart
     ├── android/
     ├── ios/
     ├── linux/
@@ -130,7 +149,7 @@ clinica/
 
 As pastas de plataforma contêm os projetos nativos, configurações e pontos de inicialização gerados pelo Flutter. Sua presença não significa que todas as plataformas tenham sido compiladas e verificadas.
 
-Os arquivos `.gitkeep` em `recepcionista` e `profissional_saude` permitem versionar pastas ainda vazias. Eles não executam código.
+Os arquivos `.gitkeep` em `recepcionista` e `médicos` permitem versionar pastas ainda vazias. Eles não executam código.
 
 ## Arquitetura e responsabilidades
 
@@ -140,24 +159,24 @@ O frontend segue uma separação inspirada em Clean Architecture:
 |---|---|
 | `lib/` | Código Dart da aplicação |
 | `lib/repositorios/` | Agrupa as três frentes do projeto; apesar do nome, contém módulos completos, não apenas classes de repositório |
-| `paciente/` | Funcionalidades e interface voltadas ao paciente, além da pasta do backend do chatbot |
-| `paciente/domain/` | Entidade de mensagem e contrato de armazenamento da conversa |
-| `paciente/data/` | Implementação concreta do armazenamento local |
-| `paciente/presentation/` | Tela, widgets e controle de estado Riverpod |
-| `paciente/chatbot/` | Backend Python independente, com cinco arquivos principais |
+| `paciente atendimento virtual/` | Funcionalidades e interface voltadas ao paciente, além da pasta do backend do chatbot |
+| `paciente atendimento virtual/domain/` | Entidades da conversa, opções, resposta do atendimento e contrato do repositório |
+| `paciente atendimento virtual/data/` | Histórico em memória, chamadas HTTP e conversão da resposta Python para entidades Dart |
+| `paciente atendimento virtual/presentation/` | Tela, widgets e controle de estado Riverpod |
+| `paciente atendimento virtual/backend do chatbot/` | Backend Python independente, com cinco arquivos principais |
 
-O domínio Dart não importa Flutter, Riverpod ou uma implementação concreta de armazenamento. O provider escolhe `ConversaLocalRepository` e o utiliza através do contrato `ConversaRepository`.
+O domínio Dart não importa Flutter, Riverpod ou uma implementação concreta de armazenamento. O provider escolhe `ConversaApiRepository` e o utiliza através do contrato `ConversaRepository`.
 
-O backend mantém a separação por **arquivos**, sem criar uma pasta para cada camada. A organização implementada é:
+O backend mantém a separação por **arquivos**, sem criar uma pasta para cada camada. A organização prevista é:
 
 ```text
 main.py recebe HTTP
     → schemas.py valida os dados
     → service.py conduz o funil
-    → repository.py consulta a agenda e registra a reserva
+    → repository.py fornece o catálogo inicial; disponibilidade e reserva são próximas etapas
 ```
 
-Essa sequência descreve o fluxo implementado. O Flutter chama as rotas HTTP e exibe a mensagem e as opções recebidas.
+A abertura já conecta rota, schemas, serviço e catálogo de atendimentos. A consulta de disponibilidade e a reserva continuam previstas para implementação.
 
 O Flutter e o backend são processos separados. Guardar Python dentro de `lib/` organiza o repositório, mas não faz o Flutter iniciar ou executar o backend.
 
@@ -169,7 +188,7 @@ O Flutter e o backend são processos separados. Guardar Python dentro de `lib/` 
 
 - `main()` inicia o aplicativo dentro de um `ProviderScope`, necessário para disponibilizar o estado Riverpod.
 - `MyApp` configura o `MaterialApp`, o título e o tema escuro baseado em verde.
-- Define `PacientePage` como tela inicial.
+- Define `PacientePage` como tela inicial e registra as rotas nomeadas da recepcionista.
 
 Este arquivo conecta a aplicação à tela. As regras de envio local ficam no controller Riverpod.
 
@@ -181,16 +200,25 @@ Agrupa os objetos que representam os dados da funcionalidade, sem componentes vi
 
 #### `mensagem_paciente.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/domain/entities/mensagem_paciente.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/domain/entities/mensagem_paciente.dart).
 
-Define `MensagemPaciente`, com dois campos imutáveis:
+Define `MensagemPaciente`, usada para as falas do paciente e do assistente:
 
 | Campo | Tipo | Significado |
 |---|---|---|
 | `texto` | `String` | Conteúdo da mensagem |
-| `nomeAnexo` | `String?` | Nome opcional do arquivo selecionado |
+| `nomeAnexo` | `String?` | Nome opcional do arquivo selecionado, apenas para exibição local |
+| `autor` | `AutorMensagem` | Distingue `paciente` de `assistente`; o padrão é paciente |
+| `opcoes` | `List<OpcaoAtendimento>` | Botões de escolha que acompanham uma resposta do backend |
 
-A entidade não guarda bytes do arquivo, autor, horário ou status de entrega. Esses dados não fazem parte do modelo atual.
+A entidade não guarda bytes do arquivo, horário ou status de entrega. Esses dados não fazem parte do modelo atual.
+
+#### `resposta_chatbot.dart`
+
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/domain/entities/resposta_chatbot.dart).
+
+- `OpcaoAtendimento`: contém o ID e a descrição de uma opção enviada pelo backend.
+- `RespostaChatbot`: contém etapa, mensagem, opções e atendimento selecionado. Representa a resposta já convertida para Dart, sem depender de JSON ou HTTP.
 
 ### Pasta `domain/repositories/`
 
@@ -198,14 +226,15 @@ Agrupa os contratos de acesso aos dados. Um contrato declara as operações nece
 
 #### `conversa_repository.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/domain/repositories/conversa_repository.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/domain/repositories/conversa_repository.dart).
 
 Define a interface `ConversaRepository`:
 
 - `listar()`: retorna as mensagens armazenadas.
-- `adicionar(mensagem)`: adiciona uma mensagem.
+- `adicionar(mensagem)`: adiciona uma mensagem ao histórico da tela.
+- `responder(texto)`: retorna `Future<RespostaChatbot>` com a resposta do atendimento.
 
-O contrato atual é síncrono porque representa apenas o histórico local. A comunicação HTTP com o chatbot é feita separadamente pelo serviço `ChatbotApi`.
+O acesso ao histórico é síncrono; a comunicação com o atendimento é assíncrona. A interface conhece esse contrato, sem importar o pacote HTTP.
 
 ## Paciente: data
 
@@ -213,25 +242,21 @@ O contrato atual é síncrono porque representa apenas o histórico local. A com
 
 Contém a implementação concreta do contrato de conversa.
 
-#### `conversa_local_repository.dart`
+#### `conversa_api_repository.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/data/repositories/conversa_local_repository.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/data/repositories/conversa_api_repository.dart).
 
-Define `ConversaLocalRepository`, que implementa `ConversaRepository`:
+Define `ConversaApiRepository`, que implementa `ConversaRepository`:
 
-- Guarda mensagens em uma lista privada `_mensagens`.
-- `listar()` devolve uma cópia não modificável da lista.
-- `adicionar()` inclui uma mensagem na lista interna.
+- Mantém as mensagens em uma lista privada durante a sessão da tela.
+- Recebe um `http.Client` e a URL do backend por injeção.
+- Envia `POST /chatbot/mensagens` com `{"texto": "..."}` em JSON.
+- Decodifica a resposta como UTF-8, preservando os acentos em nomes como Psicólogo.
+- Converte `etapa`, `mensagem`, `opcoes` e `atendimento_selecionado` para entidades Dart.
+- Trata status HTTP diferente de 200 e formato inválido como falhas.
+- Limita a espera a 15 segundos, configuráveis no construtor.
 
-Não acessa API, banco ou arquivos. Os dados duram enquanto a instância do repositório existir e não são restaurados após encerrar a aplicação.
-
-### Pasta `data/services/`
-
-#### `chatbot_api.dart`
-
-[Abrir arquivo](app/lib/repositorios/paciente/data/services/chatbot_api.dart).
-
-Implementa o cliente HTTP usado pelo controller para criar conversas e enviar as escolhas ao backend. A URL padrão é `http://127.0.0.1:8000` e pode ser alterada com `--dart-define=CHATBOT_API_URL=...`. O histórico mostrado no app continua sendo mantido em memória pelo repositório local. HTTP sem TLS serve apenas ao desenvolvimento local; em produção, use HTTPS.
+O arquivo substitui a implementação exclusivamente local anterior. O histórico ainda não é persistido em banco.
 
 ## Paciente: presentation
 
@@ -243,13 +268,13 @@ Contém a composição da tela completa.
 
 #### `paciente_page.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/presentation/pages/paciente_page.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/presentation/pages/paciente_page.dart).
 
 Define `PacientePage`, um `ConsumerStatefulWidget`, e seu estado `_PacientePageState`.
 
 Responsabilidades:
 
-- Iniciar a conversa com a API e observar `conversaProvider` para exibir mensagens, opções e erros.
+- Observar `conversaProvider` para exibir mensagens, espera, erros e opções de atendimento.
 - Montar o fundo, o gradiente, a marca, a lista de mensagens e o campo de entrada.
 - Ajustar espaçamento e composição com `SafeArea` e `LayoutBuilder`.
 - Usar uma composição compacta abaixo de 700 pixels de largura e um cabeçalho reduzido abaixo de 540 pixels de altura disponível.
@@ -258,11 +283,11 @@ Responsabilidades:
 
 Métodos importantes:
 
-- `_enviar()`: encaminha a escolha ao backend pelo controller Riverpod e limpa o texto após uma resposta válida.
+- `_enviar()`: encaminha texto ou ID de uma opção ao controller e limpa o campo assim que o envio é aceito. A rolagem acompanha mensagens e mudanças no estado de espera.
 - `_anexar()`: abre o seletor, encaminha somente o nome do arquivo ao estado e mostra uma mensagem caso a seleção falhe.
 - `dispose()`: libera os controllers quando a tela é removida.
 
-A tela recebe as mensagens e as opções do chatbot pelo backend.
+A tela chama o controller, que consulta o backend pelo repositório. As falas do paciente aparecem à direita, e as respostas do atendimento à esquerda. Mostra `Atendimento digitando...` durante a espera e permite tentar novamente após falha de conexão.
 
 ### Pasta `presentation/providers/`
 
@@ -270,19 +295,22 @@ Contém o estado da conversa e os comandos que a interface executa.
 
 #### `conversa_provider.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/presentation/providers/conversa_provider.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/presentation/providers/conversa_provider.dart).
 
 | Elemento | Responsabilidade |
 |---|---|
-| `chatbotApiProvider` | Criar e liberar o cliente HTTP da API |
-| `conversaRepositoryProvider` | Criar a implementação `ConversaLocalRepository`, exposta como `ConversaRepository` |
-| `conversaProvider` | Disponibilizar o `ConversaController` e seu estado por meio de `NotifierProvider` |
-| `ConversaState` | Representar mensagens, etapa de carregamento, erros e conversa ativa |
-| `ConversaController.iniciar()` | Criar a conversa na API e exibir a primeira pergunta |
-| `ConversaController.anexar(nome)` | Selecionar um anexo ou removê-lo ao receber `null` |
-| `ConversaController.enviar(texto)` | Enviar a escolha digitada à API e atualizar o histórico |
+| `conversaRepositoryProvider` | Criar o cliente HTTP, configurar a URL e disponibilizar `ConversaApiRepository`; fechar o cliente ao descartar o provider |
+| `conversaProvider` | Disponibilizar `ConversaController` e seu estado |
+| `ConversaState` | Guardar mensagens, anexo pendente, espera, erro, disponibilidade de nova tentativa e última resposta estruturada |
+| `ConversaController.enviar()` | Validar o texto, mostrar a fala do paciente, aguardar a API e adicionar a resposta do assistente |
+| `ConversaController.tentarNovamente()` | Repetir a última chamada que falhou, sem duplicar a mensagem do paciente |
+| `ConversaController.anexar()` | Selecionar ou remover o nome de um arquivo para exibição local |
 
-`iniciar()` cria a conversa remota. `enviar()` encaminha a escolha digitada à API e atualiza o histórico local com a mensagem e a resposta. O app informa quando não consegue alcançar o backend. Anexos não são enviados.
+O controller impede envios simultâneos e mensagens acima de 2.000 caracteres. Uma mensagem vazia não é enviada, mesmo que exista um anexo. Falhas de HTTP, formato ou timeout resultam em uma mensagem de erro recuperável.
+
+A URL vem de `--dart-define=CHATBOT_API_URL=...`, com padrão `http://127.0.0.1:8000`. O valor é definido ao iniciar ou compilar o Flutter.
+
+`enviar()` retorna `Future<bool>`: `true` indica que a interface aceitou o envio, enquanto o resultado da comunicação fica no estado. `textoExibido` permite mostrar o nome do botão escolhido e enviar seu ID para a API.
 
 ### Pasta `presentation/widgets/`
 
@@ -290,7 +318,7 @@ Contém componentes visuais menores utilizados pela página.
 
 #### `clinica_brand.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/presentation/widgets/clinica_brand.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/presentation/widgets/clinica_brand.dart).
 
 - `ClinicaBrand` exibe o nome **Clínica Vida & Saúde**, o slogan e o símbolo de ramo.
 - O parâmetro `compact` ajusta o tamanho da tipografia.
@@ -299,129 +327,196 @@ Contém componentes visuais menores utilizados pela página.
 
 #### `mensagem_composer.dart`
 
-[Abrir arquivo](app/lib/repositorios/paciente/presentation/widgets/mensagem_composer.dart).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/presentation/widgets/mensagem_composer.dart).
 
 Define `MensagemComposer`, o componente de entrada de mensagem:
 
 - Exibe o botão de anexo, o `TextField` e o botão de envio.
 - Mostra um `InputChip` com o nome do anexo e a ação para removê-lo.
 - Aplica borda arredondada, transparência e desfoque com `BackdropFilter`.
-- Aceita de uma a quatro linhas no campo de texto.
+- Aceita de uma a quatro linhas e até 2.000 caracteres no campo de texto.
+- Desabilita entrada, envio e alterações de anexo enquanto aguarda o backend. O envio exige texto.
 - Usa `ValueListenableBuilder` para atualizar a disponibilidade do botão de envio conforme o texto.
 - Recebe `onEnviar`, `onAnexar` e `onRemoverAnexo` como callbacks.
 
 O widget não acessa o repositório nem chama HTTP. A página fornece as ações.
 
+#### `mensagem_balao.dart`
+
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/presentation/widgets/mensagem_balao.dart).
+
+Define `MensagemBalao`, responsável pelo alinhamento e aparência de cada fala. Identifica mensagens do assistente com o título `Atendimento virtual` e apresenta as opções da API como `ActionChip`. Somente as opções da mensagem mais recente ficam ativas, e os botões são bloqueados durante o envio.
+
 ## Paciente: chatbot
 
-Backend Python com uma API de demonstração. Não possui pasta visual ou uma camada `presentation` própria. Conversas e reservas ficam apenas na memória do processo, e a agenda contém dados inteiramente fictícios; não utilizar para atendimento ou agendamentos reais.
+Backend Python com a estrutura mínima aprovada. Não possui pasta visual ou uma camada `presentation` própria.
 
 ### `main.py`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/main.py).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/main.py).
 
-- Cria a API FastAPI e uma instância do serviço com agenda fictícia.
-- `POST /conversas` inicia uma conversa e apresenta especialidades.
-- `POST /conversas/{conversa_id}/mensagens` recebe uma escolha e devolve a próxima etapa.
-- Retorna `404` quando o identificador da conversa não existe no processo atual.
-- Habilita CORS para origens locais de desenvolvimento; para outros ambientes, configure `CLINICA_CORS_ORIGINS` com uma lista de origens separadas por vírgula.
+Cria a aplicação FastAPI, conecta `AgendaRepository` a `ChatbotService` e expõe `POST /chatbot/mensagens`. A rota recebe `MensagemRequest`, chama o serviço e valida a saída com `MensagemResponse`.
 
-As rotas estão disponíveis também na documentação interativa do FastAPI. O estado é perdido ao reiniciar o servidor e não é compartilhado entre múltiplos processos.
+`GET /health` retorna `{"status": "ok"}` para o healthcheck do Docker. O middleware CORS permite o Flutter web em `localhost` e `127.0.0.1`, em portas HTTP variáveis. Outras origens podem ser incluídas em `CORS_ORIGINS`, separadas por vírgula. O código também aceita `CORS_ORIGIN_REGEX` quando configurado diretamente no ambiente do processo.
 
 ### `schemas.py`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/schemas.py).
-
-Define os formatos de dados previstos para a API:
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/schemas.py).
 
 | Modelo | Responsabilidade |
 |---|---|
-| `Etapa` | Enumerar `especialidade`, `profissional`, `data_horario`, `horario`, `confirmacao` e `concluida` |
-| `MensagemRequest` | Validar uma entrada com o campo `texto` |
+| `Etapa` | Declarar `especialidade`, `atendimento_selecionado` e as etapas futuras `profissional`, `data_horario` e `confirmacao` |
+| `MensagemRequest` | Validar o campo `texto`, removendo espaços nas extremidades, exigindo de 1 a 2.000 caracteres e rejeitando campos adicionais |
 | `OpcaoResponse` | Representar uma opção por `id` e `descricao` |
-| `MensagemResponse` | Representar o identificador da conversa, a etapa, a mensagem e a lista de opções |
+| `MensagemResponse` | Retornar `etapa`, `mensagem`, `opcoes` e `atendimento_selecionado` |
 
-Em `MensagemRequest`, Pydantic remove espaços nas extremidades, exige de 1 a 2.000 caracteres e rejeita campos adicionais.
-
-Exemplo **ilustrativo** de um objeto compatível com `MensagemResponse`:
-
-```json
-{
-  "etapa": "especialidade",
-  "mensagem": "Qual especialidade você procura?",
-  "opcoes": [
-    {"id": "pediatria", "descricao": "Pediatria"},
-    {"id": "ginecologia", "descricao": "Ginecologia"}
-  ]
-}
-```
-
-As respostas reais incluem `conversa_id`; as opções aceitam o número exibido, o respectivo `id` ou a descrição exata.
+`atendimento_selecionado` é `null` enquanto o paciente não escolher uma opção válida. Quando a escolha é identificada, o campo recebe a opção e a etapa passa a `atendimento_selecionado`. Isso não confirma nem cria uma consulta.
 
 ### `service.py`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/service.py).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/service.py).
 
-Contém `ChatbotService`, responsável por conduzir o funil e executar as regras da conversa:
+`ChatbotService.responder(texto)` implementa a abertura, sem importar FastAPI ou Pydantic:
 
-1. Solicitar a especialidade.
-2. Solicitar um profissional daquela especialidade.
-3. Solicitar uma data e, em seguida, um horário disponível.
-4. Apresentar o resumo e exigir confirmação antes da reserva.
+- Reconhece `oi`, `olá`, `bom dia`, `boa tarde` e `boa noite`, independentemente de caixa, acentos e pontuação.
+- Corresponde ao cumprimento recebido; não deduz o período do dia pelo relógio.
+- Apresenta o assistente e oferece os quatro atendimentos.
+- Aceita número, ID, nome do atendimento ou nome dentro de uma frase simples.
+- Aceita a grafia `oftamologista` como referência a `Oftalmologista`.
+- Aproveita uma escolha já informada junto à saudação.
+- Pede esclarecimento para respostas desconhecidas ou que mencionem mais de um atendimento.
 
-O serviço valida cada escolha, permite corrigir especialidade, profissional, data ou horário e só reserva após confirmação. Se o horário for ocupado durante a confirmação, oferece as opções restantes. A confirmação repetida na mesma conversa não cria outra reserva.
+A identificação é feita por regras e palavras, não por IA. Cada chamada é independente: ainda não há identificação, persistência ou histórico de conversa no backend. A resposta estruturada permite que o cliente apresente botões e envie o ID da opção no campo `texto`.
 
 ### `repository.py`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/repository.py).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/repository.py).
 
-Contém `AgendaRepository`, que fornece dados fictícios para a demonstração:
+`AgendaRepository.listar_atendimentos()` fornece o catálogo inicial na ordem dos números apresentados:
 
-- Consultar especialidades e profissionais.
-- Consultar horários disponíveis por profissional e data.
-- Registrar o agendamento sem permitir duas reservas do mesmo horário.
-- Reservar o horário em memória, impedindo duplicidade dentro do processo.
+| Número | ID | Atendimento |
+|---|---|---|
+| 1 | `oftalmologista` | Oftalmologista |
+| 2 | `psicologo` | Psicólogo |
+| 3 | `dermatologista` | Dermatologista |
+| 4 | `ortopedista` | Ortopedista |
 
-Essa implementação **não é a agenda oficial**, não persiste dados e não deve ser usada em produção. A integração com uma fonte compartilhada pelas frentes de recepção e profissional de saúde ainda precisa ser definida.
+Ainda não consulta banco, profissionais por nome, datas ou horários. A integração com a agenda oficial e a gravação de reservas serão implementadas posteriormente.
 
 ### `requirements.txt`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/requirements.txt).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/requirements.txt).
 
 Declara FastAPI, Pydantic e Uvicorn. Permite instalar as dependências do backend em um ambiente virtual Python independente das dependências Flutter.
 
 ### `.gitignore`
 
-[Abrir arquivo](app/lib/repositorios/paciente/chatbot/.gitignore).
+[Abrir arquivo](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/.gitignore).
 
-Evita versionar o ambiente `.venv/`, caches Python, arquivos compilados, cache de pytest e `.env`. Os testes do backend usam `unittest`, incluído na biblioteca padrão do Python.
+Evita versionar o ambiente `.venv/`, caches Python, arquivos compilados, cache de pytest e `.env`. A entrada de pytest apenas prepara a regra de exclusão; pytest não está declarado como dependência; os testes Python usam `unittest`, da biblioteca padrão.
+
+### Arquivos Docker
+
+| Arquivo | Responsabilidade |
+|---|---|
+| [compose.yaml](compose.yaml), na raiz | Construir e iniciar o serviço `chatbot`, configurar origem CORS, publicar a porta e reiniciar o container quando necessário |
+| [Dockerfile](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/Dockerfile) | Usar Python 3.12 slim, instalar dependências, copiar os quatro módulos Python e iniciar Uvicorn na porta 8000 como usuário sem privilégios de root |
+| [.dockerignore](app/lib/repositorios/paciente%20atendimento%20virtual/backend%20do%20chatbot/.dockerignore) | Excluir ambientes virtuais, caches, testes e `.env` do contexto da imagem |
+
+O healthcheck consulta `/health`. O container inclui as regras Python atuais; após alterá-las, reconstrua a imagem com `docker compose up --build -d --wait`.
 
 ## Fluxos do sistema
 
-### Fluxo implementado: atendimento numerado
+### Fluxo implementado: Flutter e backend Docker
 
 ```text
-Paciente inicia o chat
-    → Flutter cria uma conversa por POST /conversas
-    → API mostra especialidades numeradas
-    → Paciente envia um número por POST /conversas/{id}/mensagens
-    → API responde com opções para a próxima etapa
-    → O fluxo repete para profissional, data e horário
-    → Paciente confirma ou cancela a reserva
+Paciente digita ou escolhe um botão
+    → PacientePage chama ConversaController.enviar
+    → Controller registra a fala e ativa o estado de espera
+    → ConversaApiRepository envia JSON ao backend em Docker
+    → FastAPI valida o corpo e chama as regras Python
+    → Backend responde com mensagem, etapa e opções
+    → Repository converte JSON para RespostaChatbot
+    → Controller registra a fala do assistente e encerra a espera
+    → Tela mostra a resposta e os botões de escolha
 ```
 
-As respostas e mensagens ficam em memória no Flutter e no backend. Reiniciar o backend encerra as conversas existentes.
+Se a chamada falhar, a tela encerra a espera e oferece nova tentativa. Repetir a chamada pela ação `Tentar novamente` não duplica o balão do paciente.
 
-### Etapas do funil de agendamento
+### Fluxo implementado no backend: abertura
 
-| Etapa | Interação |
+```text
+POST /chatbot/mensagens com {"texto": "Oi, boa tarde!"}
+    → Validação Pydantic
+    → ChatbotService reconhece a saudação
+    → Resposta com apresentação do serviço e quatro opções
+
+POST /chatbot/mensagens com {"texto": "2"}
+    → Escolha identificada como Psicólogo
+    → Resposta com etapa atendimento_selecionado
+```
+
+A tela Flutter usa essa mesma rota. Para testar o backend separadamente, use o Swagger em `/docs` ou, com o container iniciado:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chatbot/mensagens \
+  -H 'Content-Type: application/json' \
+  -d '{"texto": "Oi, boa tarde!"}'
+```
+
+### Fluxo previsto: funil de agendamento
+
+| Etapa | Interação esperada | Validação a implementar |
+|---|---|---|
+| Especialidade | Perguntar qual atendimento o paciente procura | A especialidade deve existir e estar disponível |
+| Profissional | Apresentar os profissionais da especialidade | O profissional deve atender a especialidade selecionada |
+| Data e horário | Oferecer datas e depois horários do profissional | O horário deve pertencer ao profissional e continuar disponível |
+| Confirmação | Apresentar o resumo e solicitar confirmação | Revalidar a disponibilidade antes de registrar a reserva |
+
+Regras previstas para implementação:
+
+- Avançar somente com uma escolha válida para a etapa atual.
+- Permitir corrigir escolhas anteriores e limpar as escolhas posteriores que dependem delas.
+- Manter as etapas e escolhas sob controle do backend.
+- Não criar uma consulta antes da confirmação do paciente.
+- Impedir reserva duplicada e tratar a repetição da confirmação sem criar outra consulta.
+- Se o horário for ocupado, oferecer novas opções preservando as escolhas que continuarem válidas.
+
+Uma futura integração com IA poderá interpretar frases e extrair preferências. A validação das escolhas e a efetivação da reserva continuarão sendo responsabilidade do serviço e da agenda oficial. A abertura e a identificação da escolha inicial estão implementadas. As demais etapas e regras de reserva continuam pendentes.
+
+## Recepcionista: sidebar e rotas
+
+A sidebar está em `app/lib/repositorios/recepcionista/global/presentation/`. O fundo é azul claro, com o item atual destacado em verde. Contém somente Agenda, Pacientes, Profissionais e Consultas.
+
+| Arquivo, relativo a `recepcionista/` | Responsabilidade |
 |---|---|
-| Especialidade | Escolha numerada; Pediatria e Ginecologia aparecem primeiro |
-| Profissional | Escolha numerada entre profissionais da especialidade |
-| Data e horário | Escolha numerada entre datas úteis e horários disponíveis |
-| Confirmação | `1` confirma e `2` cancela; a disponibilidade é validada novamente |
+| `global/presentation/recepcionista_sidebar.dart` | Marca da clínica, quatro itens e definição de seus nomes, ícones e caminhos em `MenuRecepcionista` |
+| `global/presentation/recepcionista_layout.dart` | Composição compartilhada: sidebar fixa no desktop e drawer abaixo de 700 pixels de largura |
+| `global/recepcionista_routes.dart` | Registro das quatro rotas, conectando cada página ao layout |
+| `features/agenda/presentation/agenda_page.dart` | Exibir apenas o texto Agenda |
+| `features/pacientes/presentation/pacientes_page.dart` | Exibir apenas o texto Pacientes |
+| `features/profissionais/presentation/profissionais_page.dart` | Exibir apenas o texto Profissionais |
+| `features/consultas/presentation/consultas_page.dart` | Exibir apenas o texto Consultas |
 
-O fluxo aceita o número, o identificador ou a descrição exata de uma opção. A agenda, os profissionais e os horários são demonstrativos, não uma agenda oficial.
+Rotas disponíveis:
+
+- `/recepcionista/agenda`
+- `/recepcionista/pacientes`
+- `/recepcionista/profissionais`
+- `/recepcionista/consultas`
+
+Para iniciar diretamente a área da recepcionista, a partir da raiz do projeto:
+
+```bash
+cd app
+flutter run -d chrome --web-port=3000 --dart-define=APP_AREA=recepcionista
+```
+
+`main.dart` lê `APP_AREA` e abre a Agenda quando o valor é `recepcionista`. Sem essa opção, a entrada padrão continua sendo o atendimento virtual do paciente.
+
+Com o Flutter web executando na porta 3000, abra <http://localhost:3000/#/recepcionista/agenda>. A seleção dos itens utiliza as rotas nomeadas registradas no `MaterialApp`. As telas ainda não possuem agenda, cadastros ou consultas implementados.
+
+`app/test/recepcionista_navigation_test.dart` verifica a troca entre as quatro páginas, o destaque do item atual e a abertura e fechamento do menu compacto.
 
 ## Recursos visuais e configurações
 
@@ -440,22 +535,40 @@ O fluxo aceita o número, o identificador ou a descrição exata de uma opção.
 | `app/.gitignore` | Exclusões de caches, builds, configurações locais e outros arquivos gerados |
 | `app/.metadata` | Metadados do projeto administrados pelo Flutter |
 | `app/README.md` | README inicial do template Flutter; a documentação específica do projeto está neste arquivo da raiz |
-| `app/macos/Runner/DebugProfile.entitlements` | Permissões do aplicativo macOS em debug/profile, incluindo leitura de arquivo selecionado pelo usuário |
-| `app/macos/Runner/Release.entitlements` | Permissões do aplicativo macOS em release, incluindo leitura de arquivo selecionado pelo usuário |
+| `app/macos/Runner/DebugProfile.entitlements` | Permissões de leitura do arquivo selecionado e de conexão de rede como cliente |
+| `app/macos/Runner/Release.entitlements` | Permissões de leitura do arquivo selecionado e de conexão de rede como cliente |
+| `app/android/app/src/main/AndroidManifest.xml` | Inclui a permissão de acesso à internet |
+| `app/android/app/src/debug/AndroidManifest.xml` | Permite HTTP local na versão debug para testar o backend de desenvolvimento |
 
 ## Como executar
 
 Os comandos abaixo consideram o terminal aberto na raiz do repositório. A instalação de dependências exige acesso aos respectivos servidores de pacotes.
 
+### Iniciar o backend com Docker
+
+Na raiz do repositório, com Docker e Docker Compose disponíveis:
+
+```bash
+docker compose up --build -d --wait
+```
+
+A API ficará em <http://127.0.0.1:8000>, com documentação em `/docs`. Para acompanhar ou encerrar:
+
+```bash
+docker compose logs -f chatbot
+docker compose down
+```
+
+O Compose publica somente na interface local por padrão. `CHATBOT_PORT` altera a porta do host e `CHATBOT_BIND` altera a interface de publicação. O endereço do Flutter precisa apontar para a mesma porta.
+
 ### Frontend no navegador
 
 Use um Flutter compatível com a restrição Dart declarada no `pubspec.yaml`.
-Inicie o backend em outro terminal antes de usar o chat.
 
 ```bash
 cd app
 flutter pub get
-flutter run -d chrome --dart-define=CHATBOT_API_URL=http://127.0.0.1:8000
+flutter run -d chrome --web-port=3000
 ```
 
 Para desktop Linux, com a ferramenta de compilação da plataforma configurada:
@@ -473,12 +586,22 @@ flutter run -d chrome --no-pub
 
 O modo offline usa o que já existe no cache; não baixa pacotes ausentes nem atualizações.
 
-### Backend Python
+### Configurar a URL da API no Flutter
 
-Em outro terminal, a partir da raiz do repositório:
+Para Chrome e desktop no mesmo computador, o padrão `http://127.0.0.1:8000` já corresponde ao Compose. Para outra URL:
 
 ```bash
-cd app/lib/repositorios/paciente/chatbot
+flutter run -d chrome --web-port=3000 --dart-define=CHATBOT_API_URL=http://127.0.0.1:8001
+```
+
+No emulador Android, o endereço do computador costuma ser `http://10.0.2.2:8000`; informe-o com o mesmo `--dart-define`. Em um dispositivo físico, use um endereço acessível por ele e ajuste a publicação da API. Somente debug Android está configurado para HTTP local; para distribuição, utilize HTTPS.
+
+### Backend Python sem Docker, como alternativa
+
+Não execute esta alternativa na mesma porta de um container ativo. Em outro terminal, a partir da raiz do repositório:
+
+```bash
+cd "app/lib/repositorios/paciente atendimento virtual/backend do chatbot"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
@@ -493,7 +616,7 @@ Com o servidor iniciado, acesse:
 - Documentação alternativa: <http://127.0.0.1:8000/redoc>.
 - Esquema OpenAPI: <http://127.0.0.1:8000/openapi.json>.
 
-Para testar manualmente: crie uma conversa com `POST /conversas`, copie o `conversa_id` retornado e envie escolhas com `POST /conversas/{conversa_id}/mensagens`, usando JSON como `{"texto":"1"}`. O número corresponde à ordem das opções exibidas em cada etapa. No Android Emulator, configure a URL do host com `--dart-define=CHATBOT_API_URL=http://10.0.2.2:8000`; em um aparelho físico, use o endereço IP da máquina que executa a API. A raiz `/` não tem rota cadastrada.
+A documentação apresenta `POST /chatbot/mensagens`, que permite testar a abertura e a escolha de atendimento. A raiz `/` não tem rota cadastrada.
 
 ## Verificações e testes
 
@@ -509,23 +632,42 @@ flutter test
 
 Quando as dependências já estiverem resolvidas, é possível utilizar `flutter analyze --no-pub` e `flutter test --no-pub` para evitar uma resolução automática de pacotes.
 
-O arquivo [app/test/widget_test.dart](app/test/widget_test.dart) contém:
+O arquivo [app/test/widget_test.dart](app/test/widget_test.dart) utiliza `MockClient` para testar a interface e o repositório sem exigir um servidor:
 
-- Três testes de tela: 1920 × 1080, 390 × 844 e 844 × 390. Verificam as opções numeradas, o envio de uma escolha, a limpeza do campo e a ausência de erros de layout nessas condições.
-- Um teste do controller: verifica a rejeição de texto vazio, informa que anexos não são enviados e valida a atualização do histórico após a resposta da API.
+- Saudação e escolha por botão em 1920 × 1080, 390 × 844 e 844 × 390.
+- Contrato HTTP, decodificação UTF-8 e mapeamento dos campos da resposta Python.
+- Nova tentativa após falha sem duplicar a fala do paciente.
+- Rejeição de anexo isolado e tratamento de resposta inválida.
+- Indicador de espera, bloqueio de envio e timeout.
 
-Esses testes não cobrem o seletor nativo de arquivos, upload, integração real com o backend, IA ou reserva de consultas.
+[app/test/chatbot_api_integration_test.dart](app/test/chatbot_api_integration_test.dart) usa o repositório e o controller reais contra o backend. Com Docker iniciado, dentro de `app/`:
+
+```bash
+flutter test --no-pub test/chatbot_api_integration_test.dart --dart-define=CHATBOT_INTEGRATION=true
+```
+
+O teste é desativado na execução comum para não exigir Docker de quem executa somente os testes de widgets. Quando habilitado, envia uma saudação, verifica as quatro opções e seleciona Psicólogo pela API real.
+
+Esses testes não cobrem o seletor nativo de arquivos, upload, um modelo de IA ou reserva de consultas.
 
 ### Backend
 
-Dentro da pasta `chatbot`, execute os testes das regras e a verificação de sintaxe:
+Na pasta `backend do chatbot`, execute os testes da lógica, que não exigem os frameworks:
 
 ```bash
-python -m unittest
-python -m py_compile main.py schemas.py service.py repository.py test_service.py
+python3 -m unittest discover -s tests -p test_service.py -v
 ```
 
-Os testes cobrem escolhas inválidas, correções, confirmação sem duplicidade, cancelamento e conflito de horário. Ainda não há testes de integração HTTP que exercitem o fluxo completo entre API e Flutter.
+`tests/test_service.py` verifica saudação, catálogo, escolha por número/nome/ID, saudação com escolha, resposta desconhecida e ambiguidade.
+
+Para executar também os testes HTTP, com as dependências da aplicação instaladas, instale o cliente de testes no ambiente virtual:
+
+```bash
+python -m pip install httpx
+python -m unittest discover -s tests -v
+```
+
+`tests/test_api.py` verifica o contrato da rota, healthcheck, CORS e o retorno 422 para corpo inválido, texto vazio, texto excessivo e campos adicionais. Esses testes não envolvem reserva de consulta ou um modelo de IA.
 
 ## Guia de manutenção para iniciantes
 
@@ -538,27 +680,32 @@ Os testes cobrem escolhas inválidas, correções, confirmação sem duplicidade
 | O estado e a validação do envio local | `presentation/providers/conversa_provider.dart` |
 | Os dados que representam uma mensagem | `domain/entities/mensagem_paciente.dart` |
 | As operações de armazenamento da conversa | `domain/repositories/conversa_repository.dart` |
-| A implementação do armazenamento local | `data/repositories/conversa_local_repository.dart` |
-| Os campos aceitos e retornados pelo backend | `chatbot/schemas.py` |
-| A ordem das perguntas e as regras de avanço | `chatbot/service.py` |
-| A origem dos horários e a gravação da reserva | `chatbot/repository.py` |
-| As rotas da API | `chatbot/main.py` |
+| O histórico em memória e as chamadas HTTP | `data/repositories/conversa_api_repository.dart` |
+| A URL da API | `--dart-define=CHATBOT_API_URL=...`, lido no provider |
+| Os balões e botões do atendimento | `presentation/widgets/mensagem_balao.dart` |
+| O formato da resposta usada pelo Flutter | `domain/entities/resposta_chatbot.dart` |
+| Os campos aceitos e retornados pelo backend | `backend do chatbot/schemas.py` |
+| A ordem das perguntas e as regras de avanço | `backend do chatbot/service.py` |
+| A origem dos horários e a gravação da reserva | `backend do chatbot/repository.py` |
+| As rotas da API | `backend do chatbot/main.py` |
 | Dependências Flutter | `app/pubspec.yaml` |
-| Dependências Python | `chatbot/requirements.txt` |
+| Dependências Python | `backend do chatbot/requirements.txt` |
 
-Os caminhos curtos de `presentation`, `domain`, `data` e `chatbot` nessa tabela são relativos a `app/lib/repositorios/paciente/`.
+Os caminhos curtos de `presentation`, `domain`, `data` e `backend do chatbot` nessa tabela são relativos a `app/lib/repositorios/paciente atendimento virtual/`.
 
-Leia primeiro a entidade de mensagem e seu contrato; depois o repositório local, o controller e a tela. Para o backend, comece pelos schemas, serviço, repositório demonstrativo e rotas.
+Leia primeiro a entidade de mensagem e seu contrato; depois o repositório local, o controller e a tela. Para o backend, comece pelos schemas, entenda o funil documentado no serviço e então defina as operações de agenda necessárias.
 
 ## Próximas etapas
 
-Próximas etapas para transformar a demonstração em funcionalidade real:
+As tarefas abaixo são evolução prevista, não funcionalidades existentes:
 
-1. Definir uma fonte oficial de agenda compartilhada pelas três frentes e substituir o repositório demonstrativo.
-2. Persistir conversas e agendamentos; hoje o estado existe apenas na memória de um processo.
-3. Definir autenticação e vincular conversas e consultas ao paciente correspondente.
-4. Integrar o Flutter à API com um cliente HTTP e adaptar o estado Riverpod ao processamento assíncrono.
-5. Configurar as origens CORS permitidas para a interface web, se aplicável.
-6. Escolher e integrar um modelo de IA, mantendo as credenciais no backend e as regras de reserva no serviço.
+1. Definir onde ficam o estado e a identificação de cada conversa.
+2. Definir as operações da agenda e sua fonte oficial compartilhada pelas três frentes.
+3. Continuar o funil em `ChatbotService` a partir da escolha inicial já implementada, acrescentando as transições, correções e confirmações.
+4. Implementar as operações de `AgendaRepository`, incluindo proteção contra reservas duplicadas na fonte de dados.
+5. Ampliar a rota de mensagens ou definir novas rotas para as próximas operações, usando schemas Pydantic.
+6. Definir autenticação e vincular conversas e consultas ao paciente correspondente.
+7. Definir as origens CORS e os endereços HTTPS do ambiente de publicação. A integração HTTP local já está implementada.
+8. Escolher e integrar o modelo de IA, mantendo as credenciais no backend e as regras de reserva no serviço.
 
 A estrutura Python pode permanecer nos cinco arquivos enquanto as responsabilidades forem pequenas. A divisão em novas pastas deve acompanhar necessidades concretas do código.
